@@ -53,10 +53,10 @@ export default function App() {
             </div>
             <div>
               <span className="font-bold text-white text-lg tracking-tight">MarketLens</span>
-              <span className="text-gray-500 text-sm ml-2">· Markets don't move in a vacuum</span>
+              <span className="hidden sm:inline text-gray-500 text-sm ml-2">· Markets don't move in a vacuum</span>
             </div>
           </div>
-          <div className="text-xs text-gray-500">Powered by Yahoo Finance</div>
+          <div className="hidden sm:block text-xs text-gray-500">Powered by Yahoo Finance</div>
         </div>
       </header>
 

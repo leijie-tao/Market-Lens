@@ -233,7 +233,7 @@ export default function StockChart({ data, spyData, events, ticker, tickerColor,
           ))}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center flex-wrap gap-2">
           {/* S&P 500 toggle */}
           <button
             onClick={(e) => { e.stopPropagation(); setShowSpy((v) => !v); }}
@@ -267,7 +267,7 @@ export default function StockChart({ data, spyData, events, ticker, tickerColor,
         </div>
       </div>
 
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={typeof window !== "undefined" && window.innerWidth < 640 ? 280 : 400}>
         <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 10, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#1e2433" vertical={false} />
           <XAxis dataKey="date" tickFormatter={formatXAxis}
