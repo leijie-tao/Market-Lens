@@ -5,6 +5,7 @@ import TickerSearch from "./components/TickerSearch";
 import EventLegend from "./components/EventLegend";
 import PredictionPanel from "./components/PredictionPanel";
 import AIEventsPanel from "./components/AIEventsPanel";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { EVENTS, TICKER_META, EVENT_COLORS } from "./data/events";
 import { fetchStockHistory, prefetchAll } from "./data/stockApi";
 import BUNDLED from "./data/priceData.json";
@@ -177,11 +178,17 @@ export default function App() {
 
         {/* Prediction + News */}
         {!loading && chartData.length > 0 && (
-          <PredictionPanel ticker={ticker} chartData={chartData} tickerColor={meta.color} />
+          <ErrorBoundary>
+            <PredictionPanel ticker={ticker} chartData={chartData} tickerColor={meta.color} />
+          </ErrorBoundary>
         )}
 
         {/* AI-curated events */}
-        {!loading && <AIEventsPanel ticker={ticker} tickerColor={meta.color} />}
+        {!loading && (
+          <ErrorBoundary>
+            <AIEventsPanel ticker={ticker} tickerColor={meta.color} />
+          </ErrorBoundary>
+        )}
 
         {/* Event Timeline Grid */}
         {events.length > 0 && (

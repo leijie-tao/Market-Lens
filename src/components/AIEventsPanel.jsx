@@ -44,7 +44,9 @@ Only include events that caused a measurable stock move of 3% or more. Order by 
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `API error ${res.status}`);
+    const e = new Error(err?.error?.message || `API error ${res.status}`);
+    e.status = res.status;
+    throw e;
   }
 
   const data = await res.json();
@@ -77,7 +79,17 @@ export default function AIEventsPanel({ ticker, tickerColor }) {
       const result = await fetchAIEvents(ticker, range.from, range.to, apiKey.trim());
       setEvents(result);
     } catch (e) {
-      setError(e.message || "Failed to fetch. Check your API key.");
+      if (e.status === 401) {
+        setError("Invalid API key — make sure you copied it in full from console.anthropic.com.");
+      } else if (e.status === 429) {
+        setError("Rate limit or credit balance exceeded — check your usage at console.anthropic.com.");
+      } else if (e.status >= 500) {
+        setError("Anthropic servers returned an error. Try again in a moment.");
+      } else if (!navigator.onLine || e.name === "TypeError") {
+        setError("Network error — check your internet connection and try again.");
+      } else {
+        setError(e.message || "Something went wrong. Check your API key and try again.");
+      }
     } finally {
       setLoading(false);
     }
