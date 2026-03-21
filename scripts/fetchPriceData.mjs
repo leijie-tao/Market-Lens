@@ -7,7 +7,7 @@ import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const TICKERS = ["NVDA", "TSLA", "AMZN", "META", "AAPL", "MSFT", "SPY"];
+const TICKERS = ["NVDA", "TSLA", "AMZN", "META", "AAPL", "MSFT", "GOOGL", "AMD", "NFLX", "JPM", "BABA", "SPY"];
 const FROM = "2020-01-01";
 
 async function fetchTicker(ticker) {
