@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { TrendingUp, TrendingDown, Minus, ExternalLink, RefreshCw, Newspaper, ChevronDown, ChevronUp } from "lucide-react";
 import { EVENTS } from "../data/events";
 
@@ -185,13 +185,16 @@ export default function PredictionPanel({ ticker, chartData, tickerColor }) {
   const [newsLoading, setNewsLoading] = useState(true);
   const [newsError, setNewsError] = useState(false);
 
-  useEffect(() => {
+  // Extracted so both useEffect and the retry button can call it
+  const loadNews = useCallback(() => {
     setNewsLoading(true);
     setNewsError(false);
     fetchLiveNews(ticker)
       .then((items) => { setNews(items); setNewsLoading(false); })
       .catch(() => { setNewsError(true); setNewsLoading(false); });
   }, [ticker]);
+
+  useEffect(() => { loadNews(); }, [loadNews]);
 
   // Compute signal
   const events = EVENTS[ticker] || [];
@@ -336,16 +339,27 @@ export default function PredictionPanel({ ticker, chartData, tickerColor }) {
               </div>
             ))
           ) : newsError || news.length === 0 ? (
-            <div className="px-5 py-4 text-gray-500 text-sm">
-              Live news unavailable.{" "}
-              <a
-                href={`https://finance.yahoo.com/quote/${ticker}/news/`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:underline inline-flex items-center gap-1"
-              >
-                View on Yahoo Finance <ExternalLink size={11} />
-              </a>
+            <div className="px-5 py-6 flex flex-col items-center gap-3 text-center">
+              <p className="text-gray-400 text-sm">
+                Could not load news — the RSS proxy may be temporarily unavailable.
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={loadNews}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-semibold transition-colors"
+                >
+                  <RefreshCw size={12} />
+                  Retry
+                </button>
+                <a
+                  href={`https://finance.yahoo.com/quote/${ticker}/news/`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  View on Yahoo Finance <ExternalLink size={11} />
+                </a>
+              </div>
             </div>
           ) : (
             news.map((item, i) => (
