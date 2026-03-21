@@ -54,6 +54,10 @@ for (const ticker of TICKERS) {
 }
 
 const outPath = resolve(__dirname, "../src/data/priceData.json");
-writeFileSync(outPath, JSON.stringify(output));
+const result = {
+  _meta: { fetchedAt: new Date().toISOString() },
+  ...output,
+};
+writeFileSync(outPath, JSON.stringify(result));
 console.log(`\nSaved to src/data/priceData.json`);
-console.log(`Fetched at: ${new Date().toLocaleString()}`);
+console.log(`Fetched at: ${new Date().toISOString()}`);
