@@ -9,6 +9,9 @@ import { EVENTS, TICKER_META, EVENT_COLORS } from "./data/events";
 import { fetchStockHistory, prefetchAll } from "./data/stockApi";
 import BUNDLED from "./data/priceData.json";
 const SPY_DATA = BUNDLED["SPY"] || [];
+const DATA_DATE = BUNDLED._meta?.fetchedAt
+  ? new Date(BUNDLED._meta.fetchedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+  : null;
 
 const DEFAULT_TICKER = "NVDA";
 
@@ -162,9 +165,14 @@ export default function App() {
         {/* Legend + tip */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <EventLegend />
-          <p className="text-gray-500 text-xs">
-            Click any marker · Drag the brush below the chart to zoom
-          </p>
+          <div className="flex items-center gap-3">
+            {DATA_DATE && (
+              <p className="text-gray-600 text-xs">Data as of {DATA_DATE}</p>
+            )}
+            <p className="text-gray-500 text-xs">
+              Click any marker · Drag the brush below the chart to zoom
+            </p>
+          </div>
         </div>
 
         {/* Prediction + News */}

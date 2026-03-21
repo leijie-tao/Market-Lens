@@ -1,0 +1,34 @@
+name: Update Price Data
+
+on:
+  # Runs at 4:30 PM ET (21:30 UTC) on weekdays — 30 min after NYSE close
+  # UTC offset: EST = UTC-5, EDT = UTC-4; 21:30 UTC is always after 4:00 PM ET
+  schedule:
+    - cron: '30 21 * * 1-5'
+  # Also allow manual trigger from the GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  update-prices:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Fetch latest price data
+        run: node scripts/fetchPriceData.mjs
+
+      - name: Commit and push if data changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/data/priceData.json
+          # Only commit if priceData.json actually changed; skip silently on holidays
+          git diff --staged --quiet || git commit -m "chore: update price data [$(date -u '+%Y-%m-%d')]"
+          git push
