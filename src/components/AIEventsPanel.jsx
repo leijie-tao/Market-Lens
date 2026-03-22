@@ -70,7 +70,7 @@ export default function AIEventsPanel({ ticker, tickerColor }) {
         <div className="flex items-center gap-2">
           <Sparkles size={15} style={{ color: tickerColor }} />
           <span className="text-gray-200 text-sm font-semibold">AI-Curated Events</span>
-          <span className="text-xs text-gray-500 ml-1">· powered by Claude</span>
+          <span className="text-xs text-gray-500 ml-1">· powered by Gemini</span>
         </div>
         {open ? <ChevronUp size={15} className="text-gray-500" /> : <ChevronDown size={15} className="text-gray-500" />}
       </button>
@@ -166,14 +166,14 @@ export default function AIEventsPanel({ ticker, tickerColor }) {
 
             {!events && !loading && !error && (
               <p className="text-gray-600 text-xs text-center py-4">
-                Click "Find events" to let Claude discover the biggest market-moving moments for {ticker}.
+                Click "Find events" to let Gemini discover the biggest market-moving moments for {ticker}.
               </p>
             )}
           </div>
 
           <div className="px-5 pb-4">
             <p className="text-gray-700 text-xs">
-              Powered by claude-haiku-4-5 · AI-generated results may contain inaccuracies · For educational purposes only
+              Powered by Gemini 2.0 Flash · AI-generated results may contain inaccuracies · For educational purposes only
             </p>
           </div>
         </div>
