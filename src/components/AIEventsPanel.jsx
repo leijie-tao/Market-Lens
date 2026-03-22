@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sparkles, ExternalLink, ChevronDown, ChevronUp, Key, Loader } from "lucide-react";
+import { Sparkles, ExternalLink, ChevronDown, ChevronUp, Loader } from "lucide-react";
 import { EVENT_COLORS } from "../data/events";
 
 const TYPE_ICONS = {
@@ -13,82 +13,47 @@ const YEAR_RANGES = [
   { label: "All (2020–now)", from: "2020-01-01", to: new Date().toISOString().split("T")[0] },
 ];
 
-async function fetchAIEvents(ticker, from, to, apiKey) {
-  const prompt = `You are a financial research assistant with knowledge of stock market history.
-
-Return the 6 most market-moving events for ${ticker} between ${from} and ${to}.
-
-Respond with ONLY a valid JSON array — no explanation, no markdown, no code fences. Each object must have exactly these fields:
-- "date": "YYYY-MM-DD" (the exact date the event became public)
-- "category": one of exactly: "earnings" | "product" | "macro" | "crash" | "regulatory"
-- "headline": one concise sentence (max 15 words) describing what happened
-- "impact": one sentence describing the stock price reaction including % move if known
-- "sources": estimated media coverage as a string like "800+ articles"
-
-Only include events that caused a measurable stock move of 3% or more. Order by date ascending.`;
-
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
-    }),
-  });
+async function fetchAIEvents(ticker, from, to) {
+  const res = await fetch(
+    `/api/ai-events?ticker=${encodeURIComponent(ticker)}&from=${from}&to=${to}`,
+    { signal: AbortSignal.timeout(35000) }
+  );
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    const e = new Error(err?.error?.message || `API error ${res.status}`);
+    const e = new Error(err?.error || `API error ${res.status}`);
     e.status = res.status;
     throw e;
   }
 
-  const data = await res.json();
-  const text = data.content?.[0]?.text || "";
-  // Strip any accidental markdown fences
-  const cleaned = text.replace(/```json|```/g, "").trim();
-  return JSON.parse(cleaned);
+  return res.json();
 }
 
 export default function AIEventsPanel({ ticker, tickerColor }) {
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem("ml_claude_key") || "");
-  const [keyVisible, setKeyVisible] = useState(false);
   const [range, setRange] = useState(YEAR_RANGES[0]);
   const [events, setEvents] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [open, setOpen] = useState(false);
 
-  const saveKey = (val) => {
-    setApiKey(val);
-    if (val) localStorage.setItem("ml_claude_key", val);
-  };
-
   const handleFetch = async () => {
-    if (!apiKey.trim()) { setError("Enter your Claude API key first."); return; }
     setLoading(true);
     setError(null);
     setEvents(null);
     try {
-      const result = await fetchAIEvents(ticker, range.from, range.to, apiKey.trim());
+      const result = await fetchAIEvents(ticker, range.from, range.to);
       setEvents(result);
     } catch (e) {
-      if (e.status === 401) {
-        setError("Invalid API key — make sure you copied it in full from console.anthropic.com.");
-      } else if (e.status === 429) {
-        setError("Rate limit or credit balance exceeded — check your usage at console.anthropic.com.");
+      if (e.status === 429) {
+        setError("Too many requests — please wait a moment and try again.");
+      } else if (e.status === 503) {
+        setError("AI events are not available right now.");
       } else if (e.status >= 500) {
-        setError("Anthropic servers returned an error. Try again in a moment.");
+        setError("Server error — try again in a moment.");
       } else if (!navigator.onLine || e.name === "TypeError") {
         setError("Network error — check your internet connection and try again.");
       } else {
-        setError(e.message || "Something went wrong. Check your API key and try again.");
+        setError(e.message || "Something went wrong. Try again.");
       }
     } finally {
       setLoading(false);
@@ -114,28 +79,6 @@ export default function AIEventsPanel({ ticker, tickerColor }) {
         <div className="border-t border-gray-800">
           {/* Controls */}
           <div className="px-5 py-4 flex flex-wrap gap-3 items-end border-b border-gray-800">
-            {/* API key input */}
-            <div className="flex-1 min-w-48">
-              <label className="flex items-center gap-1 text-xs text-gray-500 mb-1">
-                <Key size={11} /> Claude API key
-              </label>
-              <div className="relative">
-                <input
-                  type={keyVisible ? "text" : "password"}
-                  value={apiKey}
-                  onChange={(e) => saveKey(e.target.value)}
-                  placeholder="sk-ant-..."
-                  className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500 pr-16"
-                />
-                <button
-                  onClick={() => setKeyVisible((v) => !v)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-xs"
-                >
-                  {keyVisible ? "hide" : "show"}
-                </button>
-              </div>
-            </div>
-
             {/* Date range */}
             <div>
               <label className="text-xs text-gray-500 mb-1 block">Date range</label>
@@ -223,18 +166,14 @@ export default function AIEventsPanel({ ticker, tickerColor }) {
 
             {!events && !loading && !error && (
               <p className="text-gray-600 text-xs text-center py-4">
-                Enter your API key and click "Find events" to let Claude search for the biggest market-moving moments for {ticker}.
+                Click "Find events" to let Claude discover the biggest market-moving moments for {ticker}.
               </p>
             )}
           </div>
 
           <div className="px-5 pb-4">
             <p className="text-gray-700 text-xs">
-              Uses claude-haiku-4-5 · Your API key is stored locally and never sent to our servers ·{" "}
-              <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer"
-                className="text-gray-500 hover:text-gray-300 inline-flex items-center gap-0.5">
-                Get a key <ExternalLink size={10} />
-              </a>
+              Powered by claude-haiku-4-5 · AI-generated results may contain inaccuracies · For educational purposes only
             </p>
           </div>
         </div>
