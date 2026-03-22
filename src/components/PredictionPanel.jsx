@@ -43,6 +43,65 @@ function computeMomentum(chartData) {
   return score;
 }
 
+// Average absolute weekly % change over the last 52 weeks (annualised volatility proxy)
+function computeVolatility(chartData) {
+  if (!chartData || chartData.length < 4) return null;
+  const window = chartData.slice(-52);
+  const changes = [];
+  for (let i = 1; i < window.length; i++) {
+    const prev = window[i - 1].close;
+    const curr = window[i].close;
+    if (prev && curr) changes.push(Math.abs((curr - prev) / prev) * 100);
+  }
+  if (!changes.length) return null;
+  return changes.reduce((a, b) => a + b, 0) / changes.length;
+}
+
+// How far current price is from 52-week closing high (negative = drawdown)
+function computeDrawdown(chartData) {
+  if (!chartData || chartData.length < 2) return null;
+  const window = chartData.slice(-52);
+  const high = Math.max(...window.map((d) => d.close));
+  const current = chartData[chartData.length - 1].close;
+  return ((current - high) / high) * 100;
+}
+
+// Count bullish vs bearish events in the last 180 days
+function computeEventBalance(events) {
+  const now = Date.now();
+  let positive = 0;
+  let negative = 0;
+  events.forEach((evt) => {
+    const daysAgo = (now - new Date(evt.date + "T00:00:00").getTime()) / 86400000;
+    if (daysAgo > 180) return;
+    if (evt.type === "earnings" || evt.type === "product") positive++;
+    if (evt.type === "crash" || evt.type === "regulatory") negative++;
+  });
+  return { positive, negative };
+}
+
+// Generate a one-sentence plain-English summary of current price conditions
+function getPriceSummary(volatility, drawdown, change4w, change12w) {
+  const pos = [];
+  if (drawdown !== null) {
+    if (drawdown >= -5) pos.push("trading near its 52-week high");
+    else if (drawdown >= -15) pos.push("in mild pullback from recent highs");
+    else if (drawdown >= -30) pos.push("significantly below recent highs");
+    else pos.push("in a deep drawdown");
+  }
+  if (change4w !== null && change12w !== null) {
+    if (change4w >= 0 && change12w >= 0) pos.push("with momentum positive across both timeframes");
+    else if (change4w < 0 && change12w < 0) pos.push("with selling pressure across both timeframes");
+    else if (change4w >= 0) pos.push("showing short-term recovery but still below the 12-week level");
+    else pos.push("showing near-term weakness despite longer-term resilience");
+  }
+  if (volatility !== null) {
+    const v = volatility < 2 ? "low" : volatility < 4 ? "moderate" : volatility < 7 ? "elevated" : "high";
+    pos.push(`${v} weekly volatility`);
+  }
+  return pos.length ? "Currently " + pos.join(", ") + "." : "";
+}
+
 async function fetchLiveNews(ticker) {
   const rssUrl = `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${ticker}&region=US&lang=en-US`;
   const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
@@ -215,27 +274,59 @@ export default function PredictionPanel({ ticker, chartData, tickerColor }) {
   let signal, signalColor, horizon, advice, bgGradient;
   if (totalScore >= 3) {
     signal = "BULLISH"; signalColor = "#10b981";
-    horizon = "mid"; advice = "Momentum and recent catalysts align. Consider accumulating on pullbacks.";
+    horizon = "mid"; advice = "Recent catalysts and price trend are broadly aligned to the upside.";
     bgGradient = "from-emerald-950/50 to-gray-900";
   } else if (totalScore >= 1) {
     signal = "MILD BULLISH"; signalColor = "#34d399";
-    horizon = "short"; advice = "Positive lean but watch for confirmation. Wait for a dip entry.";
+    horizon = "short"; advice = "More positive signals than negative, but the picture is not conclusive.";
     bgGradient = "from-emerald-950/30 to-gray-900";
   } else if (totalScore >= -1) {
     signal = "NEUTRAL"; signalColor = "#94a3b8";
-    horizon = "mid"; advice = "Mixed signals. Stay on the sidelines until a clear catalyst emerges.";
+    horizon = "mid"; advice = "No clear directional signal from recent events or price action.";
     bgGradient = "from-gray-800/50 to-gray-900";
   } else if (totalScore >= -3) {
     signal = "MILD BEARISH"; signalColor = "#f87171";
-    horizon = "short"; advice = "Near-term headwinds. Consider trimming exposure or hedging.";
+    horizon = "short"; advice = "More headwinds than tailwinds visible in recent events and momentum.";
     bgGradient = "from-red-950/30 to-gray-900";
   } else {
     signal = "BEARISH"; signalColor = "#ef4444";
-    horizon = "long"; advice = "Significant negative pressure. Risk management is key.";
+    horizon = "long"; advice = "Multiple negative signals across recent events and price action.";
     bgGradient = "from-red-950/50 to-gray-900";
   }
 
-  const confidence = Math.min(95, Math.round(50 + Math.abs(totalScore) * 8));
+  // Risk factor computations
+  const volatility = computeVolatility(chartData);
+  const drawdown = computeDrawdown(chartData);
+  const eventBalance = computeEventBalance(events);
+  const last = chartData[chartData.length - 1]?.close;
+  const w4 = chartData[chartData.length - 5]?.close;
+  const w12 = chartData[chartData.length - 13]?.close;
+  const change4w = last && w4 ? ((last - w4) / w4) * 100 : null;
+  const change12w = last && w12 ? ((last - w12) / w12) * 100 : null;
+
+  // Short directional guidance shown under the signal label
+  const signalSubLabel =
+    totalScore >= 3  ? "Strong tailwinds" :
+    totalScore >= 1  ? "Slight positive lean" :
+    totalScore >= -1 ? "No clear direction" :
+    totalScore >= -3 ? "Stay cautious" :
+                       "Risks elevated";
+  const signalSubColor =
+    totalScore >= -1 && totalScore <= 1 ? "#6b7280" : signalColor;
+
+  // Price summary sentence
+  const priceSummary = getPriceSummary(volatility, drawdown, change4w, change12w);
+
+  // Event overview: use all scored events (no time cutoff) so panel always has data
+  const allScoredEvents = events.map((evt) => {
+    const daysAgo = (now - new Date(evt.date + "T00:00:00").getTime()) / 86400000;
+    return { ...evt, score: scoreEvent(evt, daysAgo) };
+  });
+  const posEvents = allScoredEvents.filter((e) => e.score > 0);
+  const negEvents = allScoredEvents.filter((e) => e.score < 0);
+  const totalEventCount = posEvents.length + negEvents.length;
+  const posPercent = totalEventCount > 0 ? (posEvents.length / totalEventCount) * 100 : 50;
+
   const topFactors = recentEvents
     .sort((a, b) => Math.abs(b.score) - Math.abs(a.score))
     .slice(0, 3);
@@ -268,7 +359,9 @@ export default function PredictionPanel({ ticker, chartData, tickerColor }) {
                 <span className="text-xs font-black mt-1 tracking-wider" style={{ color: signalColor }}>
                   {signal}
                 </span>
-                <span className="text-xs text-gray-400 mt-0.5">{confidence}% conf.</span>
+                <span className="text-xs font-medium mt-0.5" style={{ color: signalSubColor }}>
+                  {signalSubLabel}
+                </span>
               </div>
             </div>
 
@@ -318,6 +411,152 @@ export default function PredictionPanel({ ticker, chartData, tickerColor }) {
             </p>
           </div>
         </div>
+      </div>
+
+      {/* Risk Factors */}
+      <div className="rounded-2xl border border-gray-800 bg-gray-900 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-800">
+          <div className="flex items-baseline justify-between gap-3 flex-wrap">
+            <span className="text-gray-300 text-sm font-semibold">Risk Factors · {ticker}</span>
+            <span className="text-gray-500 text-xs">Quantitative indicators — not predictions</span>
+          </div>
+          {priceSummary && (
+            <p className="text-gray-200 text-sm font-medium mt-2 leading-snug">{priceSummary}</p>
+          )}
+        </div>
+
+        {/* 2×2 indicator grid */}
+        <div className="grid grid-cols-2 divide-x divide-y divide-gray-800/60">
+
+          {/* Weekly volatility */}
+          {(() => {
+            const label = volatility === null ? "—" : volatility < 2 ? "Low" : volatility < 4 ? "Moderate" : volatility < 7 ? "Elevated" : "High";
+            const color = volatility === null ? "#6b7280" : volatility < 2 ? "#10b981" : volatility < 4 ? "#f59e0b" : volatility < 7 ? "#f97316" : "#ef4444";
+            return (
+              <div className="px-5 py-4">
+                <p className="text-gray-500 text-xs mb-1">Weekly Volatility</p>
+                <p className="text-white text-lg font-bold leading-none">
+                  {volatility !== null ? `${volatility.toFixed(1)}%` : "—"}
+                </p>
+                <p className="text-xs font-medium mt-1" style={{ color }}>{label}</p>
+              </div>
+            );
+          })()}
+
+          {/* Drawdown from 52-week high */}
+          {(() => {
+            const label = drawdown === null ? "—" : drawdown >= -5 ? "Near 52W high" : drawdown >= -15 ? "Mild pullback" : drawdown >= -30 ? "Significant" : "Deep drawdown";
+            const color = drawdown === null ? "#6b7280" : drawdown >= -5 ? "#10b981" : drawdown >= -15 ? "#f59e0b" : drawdown >= -30 ? "#f97316" : "#ef4444";
+            return (
+              <div className="px-5 py-4">
+                <p className="text-gray-500 text-xs mb-1">52W Drawdown</p>
+                <p className="text-white text-lg font-bold leading-none">
+                  {drawdown !== null ? `${drawdown.toFixed(1)}%` : "—"}
+                </p>
+                <p className="text-xs font-medium mt-1" style={{ color }}>{label}</p>
+              </div>
+            );
+          })()}
+
+          {/* 4-week momentum */}
+          {(() => {
+            const up = change4w !== null && change4w >= 0;
+            const color = change4w === null ? "#6b7280" : up ? "#10b981" : "#ef4444";
+            return (
+              <div className="px-5 py-4">
+                <p className="text-gray-500 text-xs mb-1">4-Week Momentum</p>
+                <p className="text-lg font-bold leading-none" style={{ color }}>
+                  {change4w !== null ? `${up ? "+" : ""}${change4w.toFixed(1)}%` : "—"}
+                </p>
+                <p className="text-xs font-medium mt-1" style={{ color }}>
+                  {change4w !== null ? `${up ? "Above" : "Below"} 4W avg` : ""}
+                </p>
+              </div>
+            );
+          })()}
+
+          {/* 12-week momentum */}
+          {(() => {
+            const up = change12w !== null && change12w >= 0;
+            const color = change12w === null ? "#6b7280" : up ? "#10b981" : "#ef4444";
+            return (
+              <div className="px-5 py-4">
+                <p className="text-gray-500 text-xs mb-1">12-Week Momentum</p>
+                <p className="text-lg font-bold leading-none" style={{ color }}>
+                  {change12w !== null ? `${up ? "+" : ""}${change12w.toFixed(1)}%` : "—"}
+                </p>
+                <p className="text-xs font-medium mt-1" style={{ color }}>
+                  {change12w !== null ? `${up ? "Above" : "Below"} 12W avg` : ""}
+                </p>
+              </div>
+            );
+          })()}
+
+        </div>
+      </div>
+
+      {/* Event Overview */}
+      {/* TODO: once live news data is available, switch allScoredEvents filter to past 180 days only */}
+      <div className="rounded-2xl border border-gray-800 bg-gray-900 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-800">
+          <span className="text-gray-300 text-sm font-semibold">Event Overview · {ticker}</span>
+          <p className="text-gray-600 text-xs mt-0.5">All curated events weighted by type and recency</p>
+        </div>
+
+        {totalEventCount === 0 ? (
+          <p className="px-5 py-6 text-gray-600 text-sm text-center">No significant events recorded in the past 180 days.</p>
+        ) : (
+          <div className="px-5 py-4 space-y-5">
+
+            {/* Proportion bar */}
+            <div>
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="text-emerald-400 font-medium">{posEvents.length} positive</span>
+                <span className="text-gray-500">{totalEventCount} events total</span>
+                <span className="text-red-400 font-medium">{negEvents.length} negative</span>
+              </div>
+              <div className="h-2 rounded-full bg-gray-800 overflow-hidden flex">
+                <div
+                  className="h-full rounded-l-full transition-all"
+                  style={{ width: `${posPercent}%`, background: "#10b981" }}
+                />
+                <div
+                  className="h-full rounded-r-full transition-all"
+                  style={{ width: `${100 - posPercent}%`, background: "#ef4444" }}
+                />
+              </div>
+            </div>
+
+            {/* Most impactful events */}
+            <div>
+              <p className="text-gray-500 text-xs uppercase tracking-wide mb-2">Most impactful events</p>
+              <div className="space-y-2">
+                {[...allScoredEvents]
+                  .sort((a, b) => new Date(b.date) - new Date(a.date))
+                  .slice(0, 4)
+                  .map((evt) => (
+                    <div key={evt.date} className="flex items-start gap-3 py-1">
+                      <span
+                        className="mt-1 w-2 h-2 rounded-full flex-shrink-0"
+                        style={{ background: evt.score >= 0 ? "#10b981" : "#ef4444" }}
+                      />
+                      <div className="min-w-0">
+                        <p className="text-gray-300 text-xs font-medium leading-snug">{evt.headline}</p>
+                        <p className="text-gray-600 text-xs mt-0.5">{evt.date} · {evt.label}</p>
+                      </div>
+                      <span
+                        className="flex-shrink-0 text-xs font-mono font-semibold"
+                        style={{ color: evt.score >= 0 ? "#10b981" : "#ef4444" }}
+                      >
+                        {evt.score >= 0 ? "+" : ""}{evt.score.toFixed(1)}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+          </div>
+        )}
       </div>
 
       {/* Live News */}
