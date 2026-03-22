@@ -6,6 +6,7 @@ import EventLegend from "./components/EventLegend";
 import PredictionPanel from "./components/PredictionPanel";
 import AIEventsPanel from "./components/AIEventsPanel";
 import ErrorBoundary from "./components/ErrorBoundary";
+import AboutModal from "./components/AboutModal";
 import { EVENTS, TICKER_META, EVENT_COLORS } from "./data/events";
 import { fetchStockHistory, prefetchAll } from "./data/stockApi";
 import BUNDLED from "./data/priceData.json";
@@ -23,6 +24,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [volatilityThreshold, setVolatilityThreshold] = useState(0);
   const [criteriaOpen, setCriteriaOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   // Pre-warm all demo tickers in background on first load
   useEffect(() => { prefetchAll(); }, []);
@@ -286,7 +288,16 @@ export default function App() {
 
       <footer className="border-t border-gray-800 mt-16 py-6 text-center text-xs text-gray-600">
         MarketLens · For educational purposes only · Not financial advice
+        <span className="mx-2">·</span>
+        <button
+          onClick={() => setAboutOpen(true)}
+          className="hover:text-gray-400 transition-colors underline underline-offset-2"
+        >
+          About
+        </button>
       </footer>
+
+      {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
     </div>
   );
 }
