@@ -1,12 +1,32 @@
 import { useState } from "react";
-import { Search } from "lucide-react";
+import { Search, Clock } from "lucide-react";
 import { TICKER_META } from "../data/events";
 
 const QUICK_PICKS = Object.keys(TICKER_META);
+const STORAGE_KEY = "ml_recent";
+const MAX_RECENT = 5;
+
+function loadRecent() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
 
 export default function TickerSearch({ currentTicker, onSelect }) {
   const [inputVal, setInputVal] = useState("");
   const [error, setError] = useState("");
+  const [recent, setRecent] = useState(loadRecent);
+
+  const handleSelect = (ticker) => {
+    setRecent((prev) => {
+      const updated = [ticker, ...prev.filter((t) => t !== ticker)].slice(0, MAX_RECENT);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+    onSelect(ticker);
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -18,7 +38,7 @@ export default function TickerSearch({ currentTicker, onSelect }) {
     }
     setError("");
     setInputVal("");
-    onSelect(val);
+    handleSelect(val);
   };
 
   return (
@@ -51,6 +71,38 @@ export default function TickerSearch({ currentTicker, onSelect }) {
 
       {error && <p className="text-red-400 text-xs">{error}</p>}
 
+      {/* Recently visited */}
+      {recent.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap justify-center">
+          <span className="flex items-center gap-1 text-gray-600 text-xs">
+            <Clock size={11} />
+            Recent
+          </span>
+          {recent.map((t) => {
+            const meta = TICKER_META[t];
+            const isActive = t === currentTicker;
+            return (
+              <button
+                key={t}
+                onClick={() => handleSelect(t)}
+                className={`px-3 py-1 rounded-md text-xs font-semibold transition-all border ${
+                  isActive
+                    ? "border-transparent"
+                    : "border-gray-700 text-gray-400 hover:text-white hover:border-gray-500 bg-gray-800/60"
+                }`}
+                style={
+                  isActive
+                    ? { background: `${meta.color}22`, borderColor: `${meta.color}66`, color: meta.color }
+                    : {}
+                }
+              >
+                {t}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Quick picks */}
       <div className="flex gap-2 flex-wrap justify-center">
         {QUICK_PICKS.map((t) => {
@@ -59,7 +111,7 @@ export default function TickerSearch({ currentTicker, onSelect }) {
           return (
             <button
               key={t}
-              onClick={() => onSelect(t)}
+              onClick={() => handleSelect(t)}
               className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all border ${
                 isActive
                   ? "border-transparent text-white shadow-lg scale-105"

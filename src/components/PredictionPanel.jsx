@@ -103,12 +103,21 @@ function getPriceSummary(volatility, drawdown, change4w, change12w) {
 }
 
 async function fetchLiveNews(ticker) {
+  // Try Vercel API route first (production). Falls back to allorigins.win proxy in local dev.
+  try {
+    const res = await fetch(`/api/news?ticker=${ticker}`, { signal: AbortSignal.timeout(8000) });
+    if (res.ok) return await res.json();
+    // Non-2xx from the API route (e.g. 502) — fall through to fallback
+  } catch {
+    // Network error or timeout — fall through to fallback
+  }
+
+  // Fallback: allorigins.win CORS proxy (used in local dev where /api/news is unavailable)
   const rssUrl = `https://feeds.finance.yahoo.com/rss/2.0/headline?s=${ticker}&region=US&lang=en-US`;
   const proxy = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
   const res = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
   const json = await res.json();
   const xml = json.contents;
-  // Parse RSS items
   const parser = new DOMParser();
   const doc = parser.parseFromString(xml, "text/xml");
   const items = Array.from(doc.querySelectorAll("item")).slice(0, 6);
