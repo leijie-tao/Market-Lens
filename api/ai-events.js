@@ -32,7 +32,8 @@ Only include events that caused a measurable stock move of 3% or more. Order by 
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 1024, temperature: 0.2 },
+          generationConfig: { maxOutputTokens: 4096, temperature: 0.2 },
+          thinkingConfig: { thinkingBudget: 0 },
         }),
         signal: AbortSignal.timeout(30000),
       }
