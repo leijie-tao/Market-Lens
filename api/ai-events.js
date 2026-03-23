@@ -46,14 +46,33 @@ Only include events that caused a measurable stock move of 3% or more. Order by 
     }
 
     const data = await geminiRes.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    const cleaned = text.replace(/```json|```/g, "").trim();
-    const events = JSON.parse(cleaned);
+    // gemini-2.5-flash is a thinking model — parts[0] may be the internal thought,
+    // so find the first non-thought part for the actual response
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const responsePart = parts.find((p) => !p.thought) || parts[parts.length - 1];
+    const text = responsePart?.text || "";
+
+    if (!text) {
+      console.error("[ai-events] Empty text from Gemini. Full response:", JSON.stringify(data));
+      return res.status(502).json({ error: "Gemini returned an empty response." });
+    }
+
+    // Strip markdown fences if present
+    const cleaned = text.replace(/^```(?:json)?\s*/m, "").replace(/\s*```$/m, "").trim();
+
+    let events;
+    try {
+      events = JSON.parse(cleaned);
+    } catch (parseErr) {
+      console.error("[ai-events] JSON parse failed. Raw text:", text);
+      return res.status(502).json({ error: "Failed to parse Gemini response as JSON." });
+    }
 
     // Cache for 1 hour — same query for same ticker/range returns quickly
     res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=300");
     res.status(200).json(events);
   } catch (err) {
+    console.error("[ai-events] Unexpected error:", err);
     res.status(502).json({ error: err.message || "Failed to fetch AI events" });
   }
 }
