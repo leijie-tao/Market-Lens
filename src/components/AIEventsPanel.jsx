@@ -173,7 +173,7 @@ export default function AIEventsPanel({ ticker, tickerColor }) {
 
           <div className="px-5 pb-4">
             <p className="text-gray-700 text-xs">
-              Powered by Gemini 2.0 Flash · AI-generated results may contain inaccuracies · For educational purposes only
+              Powered by Gemini 1.5 Flash · AI-generated results may contain inaccuracies · For educational purposes only
             </p>
           </div>
         </div>
