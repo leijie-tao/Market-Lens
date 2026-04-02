@@ -32,8 +32,8 @@ export default function TickerSearch({ currentTicker, onSelect }) {
     e.preventDefault();
     const val = inputVal.trim().toUpperCase();
     if (!val) return;
-    if (!TICKER_META[val]) {
-      setError(`"${val}" not in demo set. Try: ${QUICK_PICKS.join(", ")}`);
+    if (!/^[A-Z]{1,6}$/.test(val)) {
+      setError("Enter a valid ticker symbol (1–6 letters)");
       return;
     }
     setError("");
