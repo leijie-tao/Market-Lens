@@ -37,7 +37,7 @@ export default function App() {
     setError(null);
     fetchStockHistory(ticker)
       .then((data) => { setChartData(data); setLoading(false); })
-      .catch((err) => { console.error(err); setError("Could not load stock data."); setLoading(false); });
+      .catch((err) => { console.error(err); setError(err.message || "Could not load stock data."); setLoading(false); });
   }, [ticker]);
 
   const firstPrice = chartData[0]?.close;
@@ -149,8 +149,7 @@ export default function App() {
           ) : error ? (
             <div className="flex items-center justify-center h-96">
               <div className="text-center max-w-sm">
-                <p className="text-red-400 text-sm mb-2">{error}</p>
-                <p className="text-gray-500 text-xs">Make sure you have internet access.</p>
+                <p className="text-red-400 text-sm">{error}</p>
               </div>
             </div>
           ) : (
