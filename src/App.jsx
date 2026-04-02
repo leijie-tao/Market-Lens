@@ -35,6 +35,7 @@ export default function App() {
   useEffect(() => {
     setLoading(true);
     setError(null);
+    setChartData([]);
     fetchStockHistory(ticker)
       .then((data) => { setChartData(data); setLoading(false); })
       .catch((err) => { console.error(err); setError(err.message || "Could not load stock data."); setLoading(false); });
