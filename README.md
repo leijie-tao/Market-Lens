@@ -8,7 +8,7 @@ MarketLens is a stock history visualization tool that lets you see **what the pr
 
 ## Live Demo
 
-Deployed on Vercel — link coming soon
+Deployed on Vercel — [link coming soon](https://market-lens-drab.vercel.app/)
 
 ---
 
